@@ -1,0 +1,406 @@
+---
+title: "Car Price Project"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+    source_code: embed
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+#include=FALSE will not include r code in output
+#warning=FALSE will remove any warnings from output
+library(flexdashboard)
+library(tidyverse)
+library(GGally)
+library(caret) #for logistic regression
+library(broom) #for tidy() function
+```
+
+```{r load_data}
+df <- read_csv("C:/Users/Luca.Buselli/Desktop/CarPriceData.csv")
+```
+
+Introduction {data-orientation=rows}
+=======================================================================
+
+Row {data-height=250}
+-----------------------------------------------------------------------
+
+### Overview 
+
+For this project, we will follow the DCOVAC process. The process is listed below:
+
+DCOVAC – THE DATA MODELING FRAMEWORK
+
+* DEFINE the Problem
+* COLLECT the Data from Appropriate Sources
+* ORGANIZE the Data Collected
+* VISUALIZE the Data by Developing Charts
+* ANALYZE the data with Appropriate Statistical Methods
+* COMMUNICATE your Results
+
+Row {data-height=1050}
+-----------------------------------------------------------------------
+
+### The Problem & Data Collection
+
+#### The Problem
+For this project there is I am trying to analyze data regarding cars and their price. I am presented with many different variables regarding each car instance and my aim is to use these variables to predict the price of the car, try to analyze if there are any significant correlations or significant variables for which price is susceptible based on these.
+
+
+#### The Data
+This data set has 86 rows and 35 columns/variables. For this analysis, we will ignore the several columns/variables found in the raw data csv. These will be later on droped in the code bellow (after running all the raw data first. These variables include:
+
+`car_ID` variable which it is only an ID for each row of data...
+`CarBrand` variable which was used to create the CarHonda, CarNissan, CarSubaru, CarToyota, and CarVolvo column predictors (ones and zeros)...
+`aspiration` variable/column used to create the aspirationDV column (ones and zeros)...
+`doornumber` defined by all the variables that justify for a cars dimensions and also because it lacked variability...
+`doornumber` column used to create cb_hatchback, cb_sedan, and cb_wagon (ones and zeros)...
+`drivewheel` lacked variability...
+`enginetype` lacked variability...
+`cylindernumber` lacked variaibility...
+`fuelsystem` lacked variability...
+`Validation.Column` we are not validating anything in these R models...
+
+
+#### Data Sources
+I used this data set for my Automating Business Processes class which I found on Kaggel.
+
+
+### The Data
+VARIABLES TO PREDICT WITH
+
+* *CarHonda*: if car is Honda then 1, else 0. 
+* *CarNissan*: if car is Nissan then 1, else 0.
+* *CarSubaru*: if car is Subaru then 1, else 0. 
+* *CarToyota*:  if car is Toyota then 1, else 0. 
+* *CarVolvo*: if car is Volvo then 1, else 0. 
+* *aspirationDV*:  Type of engine, whether it is turbo (1) or standard (0).
+* *cb_hatchback*: if car is hatchback then 1, else 0. 
+* *cb_sedan*: if car is sedan then 1, else 0.
+* *cb_wagon*: if car is wagon then 1, else 0. 
+* *wheelbase*: the distance between the center of the front and rear wheels. 
+* *carlength*:  The length of the car. 
+* *carwidth*: The width of the car.
+* *carheight*: The height of the car.
+* *curbweight*: The weight of car including a full tank of fuel and standard equipment.
+* *enginesize*: Size of engine.
+* *boreratio*: The bore-stroke ratio is the ratio of bore to stroke. A ratio of 1:1 is referred to informally as square. Your engine's bore-stroke ratio plays a vital part in the way it produces power. The bore-stroke ratio and the cylinder volume affect the exhaust emissions and the fuel consumption of an engine.
+* *stroke*: A stroke is when the piston moves from the top center to the bottom of the cylinder.
+* *compressionratio*: Compression ratios usually range from 8:1 to 10:1. A higher compression ratio -- say, from 12:1 to 14:1 -- means higher combustion efficiency.
+* *horsepower*: Horsepower refers to the power an engine produces. It's calculated through the power needed to move 550 pounds one foot in one second or by the power needs to move 33,000 pounds one foot in one minute. 
+* *peakrpm*: RPM stands for revolutions per minute, and it's used as a measure of how fast any machine is operating at a given time.
+* *citympg and highwaympg*: MPG stands for miles per gallon and it refers to a common measurement of fuel economy - the average number of miles a vehicle can drive on one gallon of fuel. The higher the MPG, the more economically friendly a car is.
+
+
+VARIABLES WE WANT TO PREDICT
+
+* *price*:  price of each car row instance
+* *PriceDV*: categorical value of price where 1 > average car price, else 0
+
+Data
+=======================================================================
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+### Organize the Data
+Summary Statistics of variables after data cleaning.
+
+```{r, cache=TRUE}
+#the cache=TRUE can be removed. This will allow you to rerun your code without it having to run EVERYTHING from scratch every time. If the output seems to not reflect new updates, you can choose Knit, Clear Knitr cache to fix.
+
+#Clean data by replacing spaces with decimals
+colnames(df) <- make.names(colnames(df))
+#remove RAD due to it being an index so not a real continuous number
+df <- select(df,-car_ID)
+
+df <- select(df,-fueltype)
+
+df <- select(df,-aspiration)
+
+df <- select(df,-doornumber)
+
+df <- select(df,-carbody)
+
+df <- select(df,-drivewheel)
+
+df <- select(df,-enginetype)
+
+df <- select(df,-cylindernumber)
+
+df <- select(df,-fuelsystem)
+
+df <- select(df,-Validation.Column)
+
+df <- select(df,-CarBrand)
+#View data
+summary(df)
+
+```
+From this data we can see that our variables have a variety of different values based on their types. Refer to raw data table and "The Data" section of this report as to why we removed certain variables.
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+### Transform Variables
+The PriceDV column is a categorical variable that is 1 if price > average price, else 0. We will convert this categorical variables to be factors.
+```{r, cache=TRUE}
+df <- mutate(df,PriceDV=as.factor(PriceDV))
+```
+#### PriceDV Distribution
+```{r, cache=TRUE}
+as_tibble(select(df,PriceDV) %>%
+  table()) 
+
+```
+#### PriceDV (Above or Bellow average car price)
+
+<!--Instructions to import .jpg or .png images
+use getwd() to see current path structure 
+copy file into same place as .Rmd file
+put the path to this file in the link
+format: ![Alt text](book.jpg) -->
+
+![](C:/Users/Luca.Buselli/Desktop/ssdistribution.png)
+
+
+Data Viz #1
+=======================================================================
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+### Response Variables
+#### PriceDV Above(1)/Bellow(0)
+```{r, cache=TRUE}
+as_tibble(select(df,PriceDV) %>%
+         table()) %>%  
+  ggplot(aes(y=n,x=PriceDV)) + geom_bar(stat="identity")
+```
+
+We can see we have about 65% of the data as bellow the average car price(<$10597.89535). Looking at the potential predictors related to  PriceDV, we strongest relationships between car dimensions.
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Transform Variables
+
+```{r, cache=TRUE}
+ggpairs(select(df, price, PriceDV, wheelbase, carlength, carwidth, carheight, curbweight))
+```
+
+
+Data Viz #2
+=======================================================================
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+### Response Variables
+
+#### price
+```{r, cache=TRUE}
+ggplot(df, aes(price)) + geom_histogram(bins=20)
+```
+
+We can clearly see the data is skewed to the right. The majority of cars are around the 6,000 and 7,000 price point. This plus the distribution of cars being smaller than the average show that the data is made up of a small amount of cars that have very high prices. This migh indicate that brand might be a very significant factor. This or either there are very few cars that have very good performance and therefore cost more— internal aspects of the car such as variables like stroke, boreratio, engine, etc. 
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Transform Variables
+
+```{r, cache=TRUE}
+ggpairs(select(df,price,PriceDV,enginesize,boreratio,stroke,compressionratio,horsepower))
+```
+
+
+price Analysis {data-orientation=rows}
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Predict Car Price
+For this analysis we will use a Linear Regression Model.
+
+```{r, include=FALSE, cache=TRUE}
+#the include=FALSE hides the output - remove to see
+price_lm <- lm(price ~ . -PriceDV,data = df)
+summary(price_lm)
+```
+
+```{r, include=FALSE, cache=TRUE}
+#the include=FALSE hides the output - remove to see
+tidy(price_lm)
+```
+
+### Adjusted R-Squared
+
+```{r, cache=TRUE}
+ARSq<-round(summary(price_lm)$adj.r.squared,2)
+valueBox(paste(ARSq*100,'%'), icon = "fa-thumbs-up")
+```
+
+### RMSE
+
+```{r, cache=TRUE}
+Sig<-round(summary(price_lm)$sigma,2)
+valueBox(Sig, icon = "fa-thumbs-up")
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Regression Output
+
+```{r,include=FALSE, cache=TRUE}
+#knitr::kable(summary(MEDV_lm)$coef, digits = 3) #pretty table output
+summary(price_lm)$coef
+```
+
+```{r, cache=TRUE}
+# this version sorts the p-values (it is using an index to reorder the coefficients)
+idx <- order(coef(summary(price_lm))[,4])  
+out <- coef(summary(price_lm))[idx,] 
+knitr::kable(out, digits = 3) #pretty table output
+```
+
+### Residual Assumptions Explorations
+
+```{r, cache=TRUE}
+plot(price_lm, which=c(1,2)) #which tells which plots to show (1-6 different plots)
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Analysis Summary
+After examining this model, we determine that there are some predictors that are not important in predicting car price, so a pruned version of the model is created by removing predictors that are not significant.
+
+Row
+-----------------------------------------------------------------------
+
+### Predict Car Price Final Version
+For this analysis we will use a pruned Linear Regression Model. We removed all variables with a p-value greater than the alpha of 0.05.
+
+```{r, include=FALSE, cache=TRUE}
+#the include=FALSE hides the output - remove to see
+price_lm <- lm(price ~ . -PriceDV -carlength -cb_sedan -wheelbase -highwaympg -citympg -cb_wagon	-cb_hatchback -stroke -horsepower -carwidth -peakrpm -enginesize -compressionratio,data = df)
+summary(price_lm)
+```
+
+```{r, include=FALSE, cache=TRUE}
+#the include=FALSE hides the output - remove to see
+tidy(price_lm)
+```
+
+### Adjusted R-Squared
+
+```{r, cache=TRUE}
+ARSq<-round(summary(price_lm)$adj.r.squared,2)
+valueBox(paste(ARSq*100,'%'), icon = "fa-thumbs-up")
+```
+
+### RMSE
+
+```{r, cache=TRUE}
+Sig<-round(summary(price_lm)$sigma,2)
+valueBox(Sig, icon = "fa-thumbs-up")
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Regression Output
+
+```{r, include=FALSE, cache=TRUE}
+knitr::kable(summary(price_lm)$coef, digits = 3) #pretty table output
+```
+
+```{r, cache=TRUE}
+# this version sorts the p-values (it is using an index to reorder the coefficients)
+idx <- order(coef(summary(price_lm))[,4])  
+out <- coef(summary(price_lm))[idx,] 
+knitr::kable(out, digits = 3) #pretty table output
+```
+
+### Residual Assumptions Explorations
+
+```{r, cache=TRUE}
+plot(price_lm, which=c(1,2)) #which tells which plots to show (1-6 different plots)
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### Analysis Summary
+
+
+After examining this model, looking at the residual plots we can see that there are some particularities with our data. The high values at the right of the Q-Q plot show that there are some data instances that have very extreme values. We also can see a small curve at the beginning of the Residuals vs Fitted - therefore there is a pattern to the average price bellow or above being predicted better for values with a smaller price (where there is more concentration of data). Therefore, we could transform the data or try some additional models to try to improve this fit.
+
+This is somewhat expected. If you think about it, most cars are within a certain price range but then there are luxury car brands that are become outlines. In this case, all brands used are somewhat considered "equal" in a sense, except for Volvo that is considered more luxurious. This also explains why all the brands that turned out to be significant (all except for Volvo), decrease the average price, that which Volvo increases significantly since it is more luxurious.
+
+Reducing the predictors did not help with prediction of car price and did not have a big impact our fit statistics (R-square and RMSE (root mean squared error)). It reduced r-squared by 1% and increased RMSE.
+
+From the following table, we can see the effect on car price by the end predictor variables.
+
+```{r, cache=TRUE}
+#create table summary of predictor changes
+predchang = data_frame(
+  Variable = c('curbweight', 'CarSubaru','CarToyota','carheight','CarNissan','CarHonda','aspirationDV','boreratio'),
+  Direction = c('Increase','Decrease','Decrease','Decrease', 'Decrease','Decrease','Decrease','Decrease')
+)
+knitr::kable(predchang) #pretty table output
+
+```
+
+
+
+
+PriceDV Analysis {data-orientation=rows}
+=======================================================================
+
+Row {data-height=900}
+-----------------------------------------------------------------------
+
+### Predict PriceDV
+![](C:/Users/Luca.Buselli/Desktop/modelcomparison.png)
+![](C:/Users/Luca.Buselli/Desktop/ssneural.png)
+![](C:/Users/Luca.Buselli/Desktop/ssBoostedTree.png)
+![](C:/Users/Luca.Buselli/Desktop/ssFitModel.png)
+
+Conclusion
+=======================================================================
+### Summary
+
+In Conclusion, we can see that our predictors do help to predict car price.
+
+Combining the results of both types of predictor models and only reporting where agreement was found, we can see that as these variables increase they:
+```{r}
+#final table summary of predictor changes
+predchangfnl = data.frame(
+  Decrease_Car_Price = c("CarSubaru",
+                         "CarToyota",
+                         "carheight",
+                         "CarNissan",
+                         "CarHonda",
+                         "aspirationDV",
+                         "boreratio"),
+                    Increase_car_price = c("curbweight"))  
+knitr::kable(predchangfnl) #pretty table output
+
+
+```
+
+
+
+
+
+
+
+
+
